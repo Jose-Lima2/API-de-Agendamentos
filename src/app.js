@@ -2,13 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const Database = require('./models/Database');
-const app = require('./app');
 
 // Importar rotas
 const authRoutes = require('./routes/authRoutes');
 const agendamentoRoutes = require('./routes/agendamentoRoutes');
 
-const PORT = process.env.PORT || 3000;
+const app = express();
 
 // Middleware básico
 app.use(cors());
@@ -85,8 +84,8 @@ app.get('/docs', (req, res) => {
     },
     exemplos: {
       formato_data: '2024-01-15 14:30',
-      curl_login: 'curl -X POST http://localhost:3000/auth/login -H "Content-Type: application/json" -d \'{"email":"user@email.com","senha":"123456"}\'',
-      curl_agendar: 'curl -X POST http://localhost:3000/agendamentos -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d \'{"data_hora":"2024-01-15 14:30"}\''
+      curl_login: 'curl -X POST https://sua-api.vercel.app/auth/login -H "Content-Type: application/json" -d \'{"email":"user@email.com","senha":"123456"}\'',
+      curl_agendar: 'curl -X POST https://sua-api.vercel.app/agendamentos -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d \'{"data_hora":"2024-01-15 14:30"}\''
     }
   });
 });
@@ -113,55 +112,21 @@ app.use('*', (req, res) => {
   });
 });
 
-// Inicialização do servidor (apenas para ambiente local)
-async function iniciarServidor() {
-  try {
-    // Inicializar banco de dados
-    const db = new Database();
-    await db.connect();
-    await db.initTables();
-    
-    console.log('🔧 Banco de dados inicializado');
-
-    // Iniciar servidor
-    app.listen(PORT, () => {
-      console.log('🚀 Servidor rodando!');
-      console.log(`📍 URL: http://localhost:${PORT}`);
-      console.log(`📚 Documentação: http://localhost:${PORT}/docs`);
-      console.log('---');
-      console.log('📋 Endpoints disponíveis:');
-      console.log('   POST /auth/registro');
-      console.log('   POST /auth/login');
-      console.log('   GET  /auth/perfil');
-      console.log('   POST /agendamentos');
-      console.log('   PUT  /agendamentos');
-      console.log('   DELETE /agendamentos');
-      console.log('   GET  /agendamentos/meus');
-      console.log('   GET  /agendamentos/horarios-livres');
-      console.log('   GET  /agendamentos');
-      console.log('---');
-    });
-
-  } catch (error) {
-    console.error('❌ Erro ao iniciar servidor:', error.message);
-    process.exit(1);
+// Inicializar banco de dados apenas uma vez
+let dbInitialized = false;
+app.use(async (req, res, next) => {
+  if (!dbInitialized) {
+    try {
+      const db = new Database();
+      await db.connect();
+      await db.initTables();
+      console.log('🔧 Banco de dados inicializado (Vercel)');
+      dbInitialized = true;
+    } catch (error) {
+      console.error('❌ Erro ao inicializar banco:', error.message);
+    }
   }
-}
-
-// Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('\n🔄 Encerrando servidor...');
-  process.exit(0);
+  next();
 });
-
-process.on('SIGTERM', () => {
-  console.log('\n🔄 Encerrando servidor...');
-  process.exit(0);
-});
-
-// Iniciar aplicação apenas se não for ambiente Vercel
-if (require.main === module) {
-  iniciarServidor();
-}
 
 module.exports = app; 
